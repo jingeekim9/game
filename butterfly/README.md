@@ -4,3 +4,6 @@
 
 
 ## If a space that does not contain a butterfly is pressed or the butterfly is not pressed within the time limit, you will have lost the game.
+
+### Start SCreen
+![Alt text](screenshot/start_screen.png?raw=true "Title")
