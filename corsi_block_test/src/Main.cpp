@@ -21,6 +21,18 @@ int main()
 	int gameScore = 0;
 	string gameType = "";
 	bool gameChosen = false;
+	bool showBox = true;
+	int** rememberBox;
+	int level = 1;
+	int curShowLevel;
+	int curPressLevel;
+	bool pressed = false;
+	int levelFinished = false;
+	bool gameOver = false;
+	int wrong_x;
+	int wrong_y;
+	bool pressed2 = false;
+	bool realGameOver = false;
 
 	sf::Font font;
 	font.loadFromFile("fonts/Lato-Regular.ttf");
@@ -74,11 +86,27 @@ int main()
 	hardText.setStyle(sf::Text::Bold);
 	hardText.setFillColor(sf::Color::Black);
 
+	sf::Text wrongBoxText;
+	wrongBoxText.setFont(font);
+	wrongBoxText.setCharacterSize(20);
+	wrongBoxText.setStyle(sf::Text::Bold);
+	wrongBoxText.setFillColor(sf::Color::Black);
+
+	sf::Text startAgainText;
+	startAgainText.setFont(font);
+	startAgainText.setCharacterSize(30);
+	startAgainText.setStyle(sf::Text::Bold);
+	startAgainText.setFillColor(sf::Color::White);
+
 	int random_x;
 	int random_y;
 	bool startNewLevel = true;
+	bool startPressed = true;
+	bool timeUpGameOver = false;
 
 	sf::Clock clock;
+	sf::Clock clock2;
+	sf::Clock clock3;
 
 	while (window.isOpen())
 	{
@@ -120,7 +148,13 @@ int main()
 			hardText.setPosition(600, 312);
 			window.draw(hardText);
 
-			if (sf::Mouse::isButtonPressed(sf::Mouse::Left))
+			sf::Time startElapsed = clock.getElapsedTime();
+			if (startElapsed.asSeconds() > 1)
+			{
+				startPressed = false;
+			}
+
+			if (sf::Mouse::isButtonPressed(sf::Mouse::Left) && !startPressed)
 			{
 				sf::Vector2i localPosition = sf::Mouse::getPosition(window);
 				if (localPosition.x > 320 && localPosition.x < 420 && localPosition.y > 300 && localPosition.y < 350)
@@ -134,16 +168,18 @@ int main()
 					gameChosen = true;
 					gameType = "medium";
 					sizeCell = 150.0f;
+					level = 3;
 				}
 				else if (localPosition.x > 580 && localPosition.x < 680 && localPosition.y > 300 && localPosition.y < 350)
 				{
 					gameChosen = true;
 					gameType = "hard";
 					sizeCell = 120.0f;
+					level = 5;
 				}
 			}
 		}
-		else
+		else if (!realGameOver)
 		{
 			sf::Vector2f cellSize(sizeCell, sizeCell);
 
@@ -153,9 +189,31 @@ int main()
 
 				if (startNewLevel)
 				{
-					random_x = rand() % 3;
-					random_y = rand() % 3;
-
+					clock.restart();
+					curShowLevel = 0;
+					curPressLevel = 0;
+					pressed = false;
+					levelFinished = false;
+					rememberBox = new int*[level];
+					int temp = -1;
+					bool notSame = false;
+					for (int i = 0; i < level; i++)
+					{
+						notSame = false;
+						while (!notSame)
+						{
+							random_x = rand() % 3;
+							random_y = rand() % 3;
+							if ((random_x + random_y) != temp)
+							{
+								notSame = true;
+								temp = random_x + random_y;
+							}
+						}
+						rememberBox[i] = new int[2];
+						rememberBox[i][0] = random_x;
+						rememberBox[i][1] = random_y;
+					}
 					startNewLevel = false;
 				}
 
@@ -173,8 +231,159 @@ int main()
 					}
 				}
 
-				grid[random_x][random_y].setFillColor(sf::Color::Red);
-				window.draw(grid[random_x][random_y]);
+				if (showBox)
+				{
+					grid[rememberBox[curShowLevel][0]][rememberBox[curShowLevel][1]].setFillColor(sf::Color::Blue);
+					window.draw(grid[rememberBox[curShowLevel][0]][rememberBox[curShowLevel][1]]);
+				}
+				else
+				{
+					sf::Time timeIsUp = clock3.getElapsedTime();
+					if (timeIsUp.asSeconds() > 3 && !timeUpGameOver)
+					{
+						timeUpGameOver = true;
+						clock.restart();
+					}
+
+					if (sf::Mouse::isButtonPressed(sf::Mouse::Left) && !gameOver)
+					{
+						sf::Vector2i localPosition = sf::Mouse::getPosition(window);
+						int curX = rememberBox[curPressLevel][0] * cellSize.x + 2.0f;
+						int curY = rememberBox[curPressLevel][1] * cellSize.y + 2.0f;
+
+						if (localPosition.x < 600)
+						{
+							if (localPosition.x > curX && localPosition.x < (curX + cellSize.x) && localPosition.y > curY && localPosition.y < (curY + cellSize.y) && !pressed)
+							{
+								if (curPressLevel == (level - 1))
+								{
+									levelFinished = true;
+									clock.restart();
+									clock2.restart();
+									pressed = true;
+									pressed2 = true;
+								}
+								else
+								{
+									clock2.restart();
+									clock3.restart();
+									pressed2 = true;
+									curPressLevel += 1;
+								}
+							}
+							else if (!pressed2)
+							{
+								curPressLevel = 0;
+								wrong_x = (localPosition.x - 2.0f) / cellSize.x;
+								wrong_y = (localPosition.y - 2.0f) / cellSize.y;
+								gameOver = true;
+								clock.restart();
+							}
+						}
+					}
+
+					sf::Time elapsed3 = clock2.getElapsedTime();
+					if (elapsed3.asSeconds() > 0.5 && pressed2)
+					{
+						pressed2 = false;
+					}
+
+					if (gameOver)
+					{
+						grid[wrong_x][wrong_y].setFillColor(sf::Color::Red);
+						window.draw(grid[wrong_x][wrong_y]);
+						wrongBoxText.setString("Wrong Box!");
+						float textWidth = wrongBoxText.getLocalBounds().width;
+						float textHeight = wrongBoxText.getLocalBounds().height;
+						wrongBoxText.setPosition(((wrong_x * cellSize.x + 2.0f) + (cellSize.x / 2)) - textWidth / 2, ((wrong_y * cellSize.y + 2.0f) + (cellSize.y / 2)) - textHeight / 2);
+						window.draw(wrongBoxText);
+						sf::Time elapsed4 = clock.getElapsedTime();
+						if (elapsed4.asSeconds() > 1.5)
+						{
+							realGameOver = true;
+						}
+					}
+
+					if (timeUpGameOver)
+					{
+						grid[rememberBox[curPressLevel][0]][rememberBox[curPressLevel][1]].setFillColor(sf::Color::Red);
+						window.draw(grid[rememberBox[curPressLevel][0]][rememberBox[curPressLevel][1]]);
+						wrongBoxText.setString("Times Up!");
+						float textWidth = wrongBoxText.getLocalBounds().width;
+						float textHeight = wrongBoxText.getLocalBounds().height;
+						wrongBoxText.setPosition(((rememberBox[curPressLevel][0] * cellSize.x + 2.0f) + (cellSize.x / 2)) - textWidth / 2, ((rememberBox[curPressLevel][1] * cellSize.y + 2.0f) + (cellSize.y / 2)) - textHeight / 2);
+						window.draw(wrongBoxText);
+						sf::Time elapsed4 = clock.getElapsedTime();
+						if (elapsed4.asSeconds() > 1.5)
+						{
+							realGameOver = true;
+						}
+					}
+
+					if (curPressLevel == (level - 1) && pressed)
+					{
+						grid[rememberBox[curPressLevel][0]][rememberBox[curPressLevel][1]].setFillColor(sf::Color::Green);
+						window.draw(grid[rememberBox[curPressLevel][0]][rememberBox[curPressLevel][1]]);
+
+						if (levelFinished)
+						{
+							sf::Time elapsed2 = clock.getElapsedTime();
+							if (elapsed2.asSeconds() > 1)
+							{
+								for (int i = 0; i < level; i++)
+								{
+									delete[] rememberBox[i];
+								}
+								delete[] rememberBox;
+
+								gameScore += 1;
+								pressed = true;
+								level += 1;
+								startNewLevel = true;
+								showBox = true;
+							}
+						}
+					}
+					else if (curPressLevel > 0)
+					{
+						grid[rememberBox[curPressLevel - 1][0]][rememberBox[curPressLevel - 1][1]].setFillColor(sf::Color::Green);
+						window.draw(grid[rememberBox[curPressLevel - 1][0]][rememberBox[curPressLevel - 1][1]]);
+
+						if (levelFinished)
+						{
+							sf::Time elapsed2 = clock.getElapsedTime();
+							if (elapsed2.asSeconds() > 1)
+							{
+								for (int i = 0; i < level; i++)
+								{
+									delete[] rememberBox[i];
+								}
+								delete[] rememberBox;
+
+								gameScore += 1;
+								pressed = true;
+								level += 1;
+								startNewLevel = true;
+								showBox = true;
+							}
+						}
+					}
+				}
+
+				sf::Time elapsed = clock.getElapsedTime();
+				if (elapsed.asSeconds() > 1)
+				{
+					if (curShowLevel < level - 1)
+					{
+						curShowLevel += 1;
+						clock.restart();
+					}
+					else if (showBox)
+					{
+						showBox = false;
+						clock3.restart();
+					}
+				}
 			}
 			else if (gameType == "medium")
 			{
@@ -182,9 +391,31 @@ int main()
 
 				if (startNewLevel)
 				{
-					random_x = rand() % 4;
-					random_y = rand() % 4;
-
+					clock.restart();
+					curShowLevel = 0;
+					curPressLevel = 0;
+					pressed = false;
+					levelFinished = false;
+					rememberBox = new int*[level];
+					int temp = -1;
+					bool notSame = false;
+					for (int i = 0; i < level; i++)
+					{
+						notSame = false;
+						while (!notSame)
+						{
+							random_x = rand() % 4;
+							random_y = rand() % 4;
+							if ((random_x + random_y) != temp)
+							{
+								notSame = true;
+								temp = random_x + random_y;
+							}
+						}
+						rememberBox[i] = new int[2];
+						rememberBox[i][0] = random_x;
+						rememberBox[i][1] = random_y;
+					}
 					startNewLevel = false;
 				}
 
@@ -202,8 +433,159 @@ int main()
 					}
 				}
 
-				grid[random_x][random_y].setFillColor(sf::Color::Red);
-				window.draw(grid[random_x][random_y]);
+				if (showBox)
+				{
+					grid[rememberBox[curShowLevel][0]][rememberBox[curShowLevel][1]].setFillColor(sf::Color::Blue);
+					window.draw(grid[rememberBox[curShowLevel][0]][rememberBox[curShowLevel][1]]);
+				}
+				else
+				{
+					sf::Time timeIsUp = clock3.getElapsedTime();
+					if (timeIsUp.asSeconds() > 3 && !timeUpGameOver)
+					{
+						timeUpGameOver = true;
+						clock.restart();
+					}
+
+					if (sf::Mouse::isButtonPressed(sf::Mouse::Left) && !gameOver)
+					{
+						sf::Vector2i localPosition = sf::Mouse::getPosition(window);
+						int curX = rememberBox[curPressLevel][0] * cellSize.x + 2.0f;
+						int curY = rememberBox[curPressLevel][1] * cellSize.y + 2.0f;
+
+						if (localPosition.x < 600)
+						{
+							if (localPosition.x > curX && localPosition.x < (curX + cellSize.x) && localPosition.y > curY && localPosition.y < (curY + cellSize.y) && !pressed)
+							{
+								if (curPressLevel == (level - 1))
+								{
+									levelFinished = true;
+									clock.restart();
+									clock2.restart();
+									pressed = true;
+									pressed2 = true;
+								}
+								else
+								{
+									clock2.restart();
+									clock3.restart();
+									pressed2 = true;
+									curPressLevel += 1;
+								}
+							}
+							else if (!pressed2)
+							{
+								curPressLevel = 0;
+								wrong_x = (localPosition.x - 2.0f) / cellSize.x;
+								wrong_y = (localPosition.y - 2.0f) / cellSize.y;
+								gameOver = true;
+								clock.restart();
+							}
+						}
+					}
+
+					sf::Time elapsed3 = clock2.getElapsedTime();
+					if (elapsed3.asSeconds() > 0.5 && pressed2)
+					{
+						pressed2 = false;
+					}
+
+					if (gameOver)
+					{
+						grid[wrong_x][wrong_y].setFillColor(sf::Color::Red);
+						window.draw(grid[wrong_x][wrong_y]);
+						wrongBoxText.setString("Wrong Box!");
+						float textWidth = wrongBoxText.getLocalBounds().width;
+						float textHeight = wrongBoxText.getLocalBounds().height;
+						wrongBoxText.setPosition(((wrong_x * cellSize.x + 2.0f) + (cellSize.x / 2)) - textWidth / 2, ((wrong_y * cellSize.y + 2.0f) + (cellSize.y / 2)) - textHeight / 2);
+						window.draw(wrongBoxText);
+						sf::Time elapsed4 = clock.getElapsedTime();
+						if (elapsed4.asSeconds() > 1.5)
+						{
+							realGameOver = true;
+						}
+					}
+
+					if (timeUpGameOver)
+					{
+						grid[rememberBox[curPressLevel][0]][rememberBox[curPressLevel][1]].setFillColor(sf::Color::Red);
+						window.draw(grid[rememberBox[curPressLevel][0]][rememberBox[curPressLevel][1]]);
+						wrongBoxText.setString("Times Up!");
+						float textWidth = wrongBoxText.getLocalBounds().width;
+						float textHeight = wrongBoxText.getLocalBounds().height;
+						wrongBoxText.setPosition(((rememberBox[curPressLevel][0] * cellSize.x + 2.0f) + (cellSize.x / 2)) - textWidth / 2, ((rememberBox[curPressLevel][1] * cellSize.y + 2.0f) + (cellSize.y / 2)) - textHeight / 2);
+						window.draw(wrongBoxText);
+						sf::Time elapsed4 = clock.getElapsedTime();
+						if (elapsed4.asSeconds() > 1.5)
+						{
+							realGameOver = true;
+						}
+					}
+
+					if (curPressLevel == (level - 1) && pressed)
+					{
+						grid[rememberBox[curPressLevel][0]][rememberBox[curPressLevel][1]].setFillColor(sf::Color::Green);
+						window.draw(grid[rememberBox[curPressLevel][0]][rememberBox[curPressLevel][1]]);
+
+						if (levelFinished)
+						{
+							sf::Time elapsed2 = clock.getElapsedTime();
+							if (elapsed2.asSeconds() > 1)
+							{
+								for (int i = 0; i < level; i++)
+								{
+									delete[] rememberBox[i];
+								}
+								delete[] rememberBox;
+
+								gameScore += 1;
+								pressed = true;
+								level += 2;
+								startNewLevel = true;
+								showBox = true;
+							}
+						}
+					}
+					else if (curPressLevel > 0)
+					{
+						grid[rememberBox[curPressLevel - 1][0]][rememberBox[curPressLevel - 1][1]].setFillColor(sf::Color::Green);
+						window.draw(grid[rememberBox[curPressLevel - 1][0]][rememberBox[curPressLevel - 1][1]]);
+
+						if (levelFinished)
+						{
+							sf::Time elapsed2 = clock.getElapsedTime();
+							if (elapsed2.asSeconds() > 1)
+							{
+								for (int i = 0; i < level; i++)
+								{
+									delete[] rememberBox[i];
+								}
+								delete[] rememberBox;
+
+								gameScore += 1;
+								pressed = true;
+								level += 2;
+								startNewLevel = true;
+								showBox = true;
+							}
+						}
+					}
+				}
+
+				sf::Time elapsed = clock.getElapsedTime();
+				if (elapsed.asSeconds() > 1)
+				{
+					if (curShowLevel < level - 1)
+					{
+						curShowLevel += 1;
+						clock.restart();
+					}
+					else if (showBox)
+					{
+						showBox = false;
+						clock3.restart();
+					}
+				}
 			}
 			else if (gameType == "hard")
 			{
@@ -211,9 +593,31 @@ int main()
 
 				if (startNewLevel)
 				{
-					random_x = rand() % 5;
-					random_y = rand() % 5;
-
+					clock.restart();
+					curShowLevel = 0;
+					curPressLevel = 0;
+					pressed = false;
+					levelFinished = false;
+					rememberBox = new int*[level];
+					int temp = -1;
+					bool notSame = false;
+					for (int i = 0; i < level; i++)
+					{
+						notSame = false;
+						while (!notSame)
+						{
+							random_x = rand() % 5;
+							random_y = rand() % 5;
+							if ((random_x + random_y) != temp)
+							{
+								notSame = true;
+								temp = random_x + random_y;
+							}
+						}
+						rememberBox[i] = new int[2];
+						rememberBox[i][0] = random_x;
+						rememberBox[i][1] = random_y;
+					}
 					startNewLevel = false;
 				}
 
@@ -231,8 +635,159 @@ int main()
 					}
 				}
 
-				grid[random_x][random_y].setFillColor(sf::Color::Red);
-				window.draw(grid[random_x][random_y]);
+				if (showBox)
+				{
+					grid[rememberBox[curShowLevel][0]][rememberBox[curShowLevel][1]].setFillColor(sf::Color::Blue);
+					window.draw(grid[rememberBox[curShowLevel][0]][rememberBox[curShowLevel][1]]);
+				}
+				else
+				{
+					sf::Time timeIsUp = clock3.getElapsedTime();
+					if (timeIsUp.asSeconds() > 3 && !timeUpGameOver)
+					{
+						timeUpGameOver = true;
+						clock.restart();
+					}
+
+					if (sf::Mouse::isButtonPressed(sf::Mouse::Left) && !gameOver)
+					{
+						sf::Vector2i localPosition = sf::Mouse::getPosition(window);
+						int curX = rememberBox[curPressLevel][0] * cellSize.x + 2.0f;
+						int curY = rememberBox[curPressLevel][1] * cellSize.y + 2.0f;
+
+						if (localPosition.x < 600)
+						{
+							if (localPosition.x > curX && localPosition.x < (curX + cellSize.x) && localPosition.y > curY && localPosition.y < (curY + cellSize.y) && !pressed)
+							{
+								if (curPressLevel == (level - 1))
+								{
+									levelFinished = true;
+									clock.restart();
+									clock2.restart();
+									pressed = true;
+									pressed2 = true;
+								}
+								else
+								{
+									clock2.restart();
+									clock3.restart();
+									pressed2 = true;
+									curPressLevel += 1;
+								}
+							}
+							else if (!pressed2)
+							{
+								curPressLevel = 0;
+								wrong_x = (localPosition.x - 2.0f) / cellSize.x;
+								wrong_y = (localPosition.y - 2.0f) / cellSize.y;
+								gameOver = true;
+								clock.restart();
+							}
+						}
+					}
+
+					sf::Time elapsed3 = clock2.getElapsedTime();
+					if (elapsed3.asSeconds() > 0.5 && pressed2)
+					{
+						pressed2 = false;
+					}
+
+					if (gameOver)
+					{
+						grid[wrong_x][wrong_y].setFillColor(sf::Color::Red);
+						window.draw(grid[wrong_x][wrong_y]);
+						wrongBoxText.setString("Wrong Box!");
+						float textWidth = wrongBoxText.getLocalBounds().width;
+						float textHeight = wrongBoxText.getLocalBounds().height;
+						wrongBoxText.setPosition(((wrong_x * cellSize.x + 2.0f) + (cellSize.x / 2)) - textWidth / 2, ((wrong_y * cellSize.y + 2.0f) + (cellSize.y / 2)) - textHeight / 2);
+						window.draw(wrongBoxText);
+						sf::Time elapsed4 = clock.getElapsedTime();
+						if (elapsed4.asSeconds() > 1.5)
+						{
+							realGameOver = true;
+						}
+					}
+
+					if (timeUpGameOver)
+					{
+						grid[rememberBox[curPressLevel][0]][rememberBox[curPressLevel][1]].setFillColor(sf::Color::Red);
+						window.draw(grid[rememberBox[curPressLevel][0]][rememberBox[curPressLevel][1]]);
+						wrongBoxText.setString("Times Up!");
+						float textWidth = wrongBoxText.getLocalBounds().width;
+						float textHeight = wrongBoxText.getLocalBounds().height;
+						wrongBoxText.setPosition(((rememberBox[curPressLevel][0] * cellSize.x + 2.0f) + (cellSize.x / 2)) - textWidth / 2, ((rememberBox[curPressLevel][1] * cellSize.y + 2.0f) + (cellSize.y / 2)) - textHeight / 2);
+						window.draw(wrongBoxText);
+						sf::Time elapsed4 = clock.getElapsedTime();
+						if (elapsed4.asSeconds() > 1.5)
+						{
+							realGameOver = true;
+						}
+					}
+
+					if (curPressLevel == (level - 1) && pressed)
+					{
+						grid[rememberBox[curPressLevel][0]][rememberBox[curPressLevel][1]].setFillColor(sf::Color::Green);
+						window.draw(grid[rememberBox[curPressLevel][0]][rememberBox[curPressLevel][1]]);
+
+						if (levelFinished)
+						{
+							sf::Time elapsed2 = clock.getElapsedTime();
+							if (elapsed2.asSeconds() > 1)
+							{
+								for (int i = 0; i < level; i++)
+								{
+									delete[] rememberBox[i];
+								}
+								delete[] rememberBox;
+
+								gameScore += 1;
+								pressed = true;
+								level += 3;
+								startNewLevel = true;
+								showBox = true;
+							}
+						}
+					}
+					else if (curPressLevel > 0)
+					{
+						grid[rememberBox[curPressLevel - 1][0]][rememberBox[curPressLevel - 1][1]].setFillColor(sf::Color::Green);
+						window.draw(grid[rememberBox[curPressLevel - 1][0]][rememberBox[curPressLevel - 1][1]]);
+
+						if (levelFinished)
+						{
+							sf::Time elapsed2 = clock.getElapsedTime();
+							if (elapsed2.asSeconds() > 1)
+							{
+								for (int i = 0; i < level; i++)
+								{
+									delete[] rememberBox[i];
+								}
+								delete[] rememberBox;
+
+								gameScore += 1;
+								pressed = true;
+								level += 3;
+								startNewLevel = true;
+								showBox = true;
+							}
+						}
+					}
+				}
+
+				sf::Time elapsed = clock.getElapsedTime();
+				if (elapsed.asSeconds() > 1)
+				{
+					if (curShowLevel < level - 1)
+					{
+						curShowLevel += 1;
+						clock.restart();
+					}
+					else if (showBox)
+					{
+						showBox = false;
+						clock3.restart();
+					}
+				}
 			}
 
 			text.setPosition(700, 200);
@@ -241,6 +796,32 @@ int main()
 			score.setString(to_string(gameScore));
 			score.setPosition(800, 200);
 			window.draw(score);
+		}
+		else
+		{
+			score.setString("Score: " + to_string(gameScore));
+			float scoreWidth = score.getLocalBounds().width;
+			score.setPosition(500 - (scoreWidth / 2), 200);
+			window.draw(score);
+
+			startAgainText.setString("Press Anywhere to Start Again.");
+			float startAgainWidth = startAgainText.getLocalBounds().width;
+			startAgainText.setPosition(500 - (startAgainWidth / 2), 400);
+			window.draw(startAgainText);
+
+			if (sf::Mouse::isButtonPressed(sf::Mouse::Left))
+			{
+				clock.restart();
+				clock2.restart();
+				gameChosen = false;
+				gameScore = 0;
+				showBox = true;
+				realGameOver = false;
+				gameOver = false;
+				startNewLevel = true;
+				level = 1;
+				startPressed = true;
+			}
 		}
 
 		window.display();
